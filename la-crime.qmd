@@ -1,0 +1,148 @@
+---
+title: "Crime in Los Angeles"
+format: html
+---
+
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(janitor)
+library(ggthemes)
+library(scales)
+library(plotly)
+```
+
+
+```{r}
+#| label: import and clean
+
+raw_data <- read_csv("01-unclean/Los-Angeles_Crime.csv") |>
+  clean_names()
+
+la_crime <- raw_data |>
+  mutate(
+    date_reported = mdy_hms(date_rptd), 
+    date_occurred = mdy_hms(date_occ),
+    crime_description = crm_cd_desc,
+    year_occurred = year(date_occurred)
+  ) |>
+  select(
+    date_reported,
+    date_occurred,
+    year_occurred,
+    crime_description,
+    premis_desc
+  )
+
+raw_data
+
+la_crime
+```
+
+## Analysis and Visualization
+
+```{r}
+#| label: type of crime
+
+crime_year <- la_crime |>
+  mutate(
+    crime_description = str_wrap(
+      crime_description, width = 20
+    )
+  ) |>
+  group_by(
+    year_occurred,
+    crime_description
+  ) |>
+  summarize(
+    incident_count = n(),
+    .groups = "drop"
+  ) |>
+  group_by(
+    year_occurred
+  ) |>
+  slice_max(
+    incident_count,
+    n = 10,
+    with_ties = FALSE
+  )
+
+crime_year
+```
+
+```{r}
+#| label: type of crime, point graph
+#| message: false
+
+top10_plot <- ggplot(
+  crime_year,
+  aes(
+    x = year_occurred,
+    y = incident_count,
+    color = crime_description
+  )
+) +
+  geom_point(
+    show.legend = FALSE,
+    size = 2.2
+  ) +
+  geom_line(
+    linewidth = 1.5
+  ) +
+  labs(
+    title = "Top 10 Crimes in Los Angeles from 2020 to 2024",
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: City of Los Angeles",
+    x = "Year",
+    y = "Number of Incidents",
+    color = "Type of Crime"
+  )
+  theme_minimal()
+
+top10_plot
+
+ggplotly(top10_plot)
+```
+
+Analysis:
+
+The most frequent crimes in Los Angeles are non-violent, with an exception of assault and battery. As of 2024, crime in Los Angeles, on all fronts, is declining. Interestingly, in 2022, identity theft was the second most frequent crime, with over 22,000 occurrences. Stolen vehicles have remained at the top of the list over all four years, and it saw a slight peak of almost 25,000 occurrences, also in 2022.
+
+```{r}
+#| label: type of crime, bar graph
+#| message: false
+
+top10_bar <- ggplot(
+  crime_year,
+  aes(
+    x = crime_description,
+    y = incident_count,
+    fill = crime_description
+  )
+) +
+  geom_col() +
+  labs(
+    title = "Top 10 Crimes in Los Angeles from 2020 to 2024",
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: City of Los Angeles",
+    x = "Year",
+    y = "Number of Incidents",
+    fill = "Type of Crime"
+  ) +
+  facet_wrap(
+    ~year_occurred
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_blank()
+  )
+
+top10_bar
+
+ggplotly(top10_bar)
+```
+

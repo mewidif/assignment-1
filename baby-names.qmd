@@ -1,0 +1,154 @@
+---
+title: "Most Popular Baby Names in New York City"
+format: html
+---
+
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(janitor)
+library(stringr)
+```
+
+### Import
+
+```{r}
+#| label: importing
+
+baby_names <- read_csv("01-unclean/Popular_Baby_Names.csv") |>
+  clean_names() |>
+  distinct()
+
+baby_names
+```
+
+### Analysis and Visualization
+
+```{r}
+#| label: name popularity/year
+
+popular <- baby_names |>
+  select(
+    year_of_birth,
+    gender,
+    childs_first_name,
+    count,
+    ethnicity
+  ) |>
+  mutate(
+    childs_first_name = str_to_upper(childs_first_name) |>
+      str_trim()
+  ) |>
+  group_by(
+    year_of_birth,
+    gender
+    # gender, name, and sum of ethnicity count for different babies -- will get you most popular accumulated name rather than separated by race
+  ) |>
+  slice_max(
+    count,
+    n = 1,
+    with_ties = FALSE
+  ) |>
+  ungroup() |>
+  arrange(year_of_birth, gender)
+
+popular
+```
+```{r}
+#| label: popular girl
+
+popular_girl <- popular |>
+  filter(
+    gender == "FEMALE"
+  )
+
+popular_girl
+```
+
+```{r}
+#| label: popular boy
+
+popular_boy <- popular |>
+  filter(
+    gender == "MALE"
+  )
+
+popular_boy
+```
+
+
+```{r}
+#| label: popular girl graph
+
+ggplot(
+  popular_girl,
+  aes(
+      x = year_of_birth,
+      y = count,
+      color = childs_first_name
+    )
+) +
+  geom_point(
+    size = 4
+  ) +
+  scale_color_manual(
+    values = c(
+      "ESTHER" = "darkgoldenrod1",
+      "ISABELLA" = "darkorchid2"
+    )
+  ) +
+  labs(
+    title = str_wrap("Most Popular Female Baby Names in New York City Between 2011 and 2021"),
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: City of New York",
+    x = "Year",
+    y = "Number of Babies",
+    color = "Child's First Name"
+  ) +
+  theme_minimal()
+```
+
+Analysis: 
+
+Esther and Isabella fought from 2018 to 2020 for the title of most popular, and Esther was, in 2021, the most popular baby name in New York City. This being said, the amount of people naming their female babies the most popular name was on a steep decline over the ten year period.
+
+```{r}
+# add zero
+#| label: popular boy graph
+
+ggplot(
+  popular_boy,
+  aes(
+      x = year_of_birth,
+      y = count,
+      color = childs_first_name
+    )
+) +
+  geom_point(
+    aes(),
+    size = 4
+  ) +
+  scale_color_manual(
+    values = c(
+      "LIAM" = "coral1",
+      "JAYDEN" = "cornflowerblue"
+    )
+  ) +
+  labs(
+    title = str_wrap("Most Popular Male Baby Names in the New York City Between 2011 and 2021"),
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: City of New York",
+    x = "Year",
+    y = "Number of Babies",
+    color = "Child's First Name"
+  ) +
+  theme_minimal()
+```
+
+Analysis:
+
+On a different note, regarding male baby names, it seems to be more popular to name babies the most popular name of the year. This is a strong comparison from almost 450 babies named Liam in 2021 and under 200 named Esther. 

@@ -1,0 +1,21 @@
+project:
+  type: website
+  render:
+  - "*.qmd"
+  output-dir: docs
+
+website:
+  title: "Assignment #1"
+  sidebar:
+    contents:
+      - href: index.qmd
+        text: Home
+      - auto: "*.qmd"
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
+    df-print: paged
+    code-overflow: wrap

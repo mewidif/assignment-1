@@ -1,0 +1,209 @@
+---
+title: "Border Crossing Entry Data"
+---
+
+## Setup
+
+```{r}
+#| label: setup
+#| message: false
+
+library(tidyverse)
+library(janitor)
+library(ggthemes)
+library(scales)
+library(plotly)
+```
+
+```{r}
+#| label: view
+
+show <- read_csv("01-unclean/Border_Crossing_Entry_Data.csv")
+
+show
+```
+
+
+```{r}
+#| label: import
+
+border <- read_csv("01-unclean/Border_Crossing_Entry_Data.csv") |>
+  clean_names() |>
+  mutate(
+    border_year = my(date),
+    year = year(border_year)
+  ) |>
+  select(state, border, year, measure, value)
+
+border
+```
+### Cleaning
+
+```{r}
+#| label: cleaning
+
+border |>
+  write_rds("02-clean/border.rds")
+```
+
+## Analysis and Visuals
+
+### Numbers by State
+
+```{r}
+#| label: clean import
+
+clean_border <- read_rds("02-clean/border.rds")
+```
+
+```{r}
+clean_border |>
+  count(year)
+```
+
+
+```{r}
+#| label: state values
+
+border_state <- clean_border |>
+  filter(
+    year == 2024
+  ) |>
+  group_by(state, year) |>
+  summarize(
+    border_traffic = sum(value)
+  ) |>
+  arrange(desc(border_traffic))
+
+border_state
+```
+```{r}
+#| label: state graph
+
+ggplot(
+  border_state,
+  aes(x = reorder(state, border_traffic), 
+      y = border_traffic,
+      fill = state
+  )
+) +
+  geom_col(
+    aes(),
+    show.legend = FALSE
+  ) +
+  scale_y_continuous(labels = label_comma()) +
+  labs(
+    title = "Amount of Border Traffic per Border State in 2024",
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: Department of Transportation",
+    x = "State",
+    y = "Border Traffic",
+    fill = "State"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Analysis:
+
+Texas has by far the most border traffic of any other border state with over 120 million crossings in 2024. Although California is closer behind, there is a steep decrease in border traffic around the Canadian border and other Southern states beyond Texas and California.
+
+### Country Border Traffic
+
+```{r}
+#| label: border values
+
+border_country <- clean_border |>
+  group_by(border, year) |>
+  summarize(
+    border_country_traffic = sum(value)
+  ) |>
+  arrange(year, border_country_traffic)
+
+border_country
+```
+
+```{r}
+#| label: border graph
+
+ggplot(
+  border_country,
+  aes(
+    x = year,
+    y = border_country_traffic,
+    color = border
+  )
+) +
+  scale_y_continuous(
+    labels = label_comma(),
+    limits = c(0, 400000000)
+  ) +
+  geom_line(
+    aes(),
+    size = 2
+  ) +
+  labs(
+    title = str_wrap("Border Traffic at the Canadian and Mexican borders from 1996 until 2024"),
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: Department of Transportation",
+    x = "Year",
+    y = "Border Traffic",
+    color = "Border"
+  ) +
+  theme_minimal()
+```
+
+Analysis:
+
+Border traffic along the US-Mexico border almost doubled traffic along the US-Canada border. There was a peak for border traffic along the US-Mexico border around and just before 2000, and a dramatic fall in 2020 during the COVID-19 pandemic.
+
+### Transportation Across the Border(s)
+
+```{r}
+#| label: transportation
+
+border_transportation <- clean_border |>
+  group_by(measure, year) |>
+  summarize(
+    transportation_numbers = sum(value)
+  ) |>
+  arrange(year, transportation_numbers)
+
+border_transportation
+```
+```{r}
+#| label: transportation graph
+
+transportation_graph <- ggplot(
+  border_transportation,
+  aes(
+    x = year,
+    y = transportation_numbers,
+    color = measure
+  )
+) +
+  scale_y_log10(
+    breaks = c(100000, 1000000, 10000000, 100000000),
+    labels = scales::label_number(accuracy = 1),
+  ) +
+  geom_line(
+    aes(),
+    size = 1
+  ) +
+  labs(
+    title = str_wrap("Type of Transportation for Border Traffic from 1996 to 2024"),
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: Department of Transportation",
+    x = "Year",
+    y = "Border Traffic Transportation Amount",
+    color = "Mode of Transportation"
+  ) +
+  theme_minimal()
+
+transportation_graph
+
+ggplotly(transportation_graph)
+```
+
+Analysis:
+
+The vast majority of border traffic is personal vehicle traffic. Pedestrian border traffic blew me away with almost 50 million pedestrians crossing the border in 2019. Group transportation took a hit during the pandemic, with buses dropping more than half of their report in 2019, from almost 230,000 to almost 100,000 in 2020.

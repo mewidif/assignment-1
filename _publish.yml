@@ -1,0 +1,4 @@
+- source: project
+  quarto-pub:
+    - id: 1f9c791f-79df-47c8-a743-93b4eb847a25
+      url: 'https://robertsm02.quarto.pub/first-assignment'
