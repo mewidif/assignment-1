@@ -13,6 +13,14 @@ library(janitor)
 library(ggthemes)
 library(scales)
 library(plotly)
+# Maps
+library(mapdata)
+library(maps)
+library(stringr)
+library(viridis)
+library(sf)
+library(rnaturalearth)
+library(ggmagnify)
 ```
 
 ```{r}
@@ -33,7 +41,16 @@ border <- read_csv("01-unclean/Border_Crossing_Entry_Data.csv") |>
     border_year = my(date),
     year = year(border_year)
   ) |>
-  select(state, border, year, measure, value)
+  select(
+    port_name,
+    state, 
+    border, 
+    year, 
+    measure, 
+    value,
+    longitude,
+    latitude
+  )
 
 border
 ```
@@ -57,6 +74,8 @@ clean_border <- read_rds("02-clean/border.rds")
 ```
 
 ```{r}
+#| label: border year
+
 clean_border |>
   count(year)
 ```
@@ -72,6 +91,10 @@ border_state <- clean_border |>
   group_by(state, year) |>
   summarize(
     border_traffic = sum(value)
+  ) |>
+  mutate(
+    state = str_to_upper(state) |>
+    str_trim()
   ) |>
   arrange(desc(border_traffic))
 
@@ -103,6 +126,78 @@ ggplot(
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+```{r}
+#| label: county/state coords
+
+usa <- map_data("usa")
+
+states <- map_data("state") |>
+  mutate(
+    region = str_to_upper(region) |>
+    str_trim()
+  )
+```
+
+
+```{r}
+#| label: ggplot version
+
+usa_plot <- ggplot() +
+  geom_polygon(
+    data = usa,
+    aes(
+      x = long,
+      y = lat,
+      group = group
+    ),
+    color = "gray2"
+  ) +
+  coord_quickmap()
+
+states_plot <- usa_plot +
+  geom_polygon(
+    data = states,
+    aes(
+      x = long,
+      y = lat,
+      group = group
+    ),
+    color = "gray2",
+    fill = "white"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    legend.title = element_text(size = 8),
+    legend.text = element_text(size = 6),  # Adjust legend text size
+    legend.key.width = unit(1, "cm"),  # Widen legend items
+    plot.title.position = "plot",  # Align title/subtitle properly
+    legend.box = "horizontal",
+  ) +
+  coord_quickmap()
+
+border_state_graph <- states_plot +
+  geom_map(
+    data = border_state,
+    map = states,
+    aes(
+      map_id = state,
+      fill = border_traffic
+    ),
+    color = "gray2"
+  ) +
+  labs(
+    title = "Amount of Border Traffic per Border State in 2024",
+    subtitle = str_wrap("Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: Department of Transportation",
+    fill = "Border Traffic"
+  ) +
+  scale_fill_gradient(low = "blue", high = "orange", labels = comma)
+
+border_state_graph
+```
+
 Analysis:
 
 Texas has by far the most border traffic of any other border state with over 120 million crossings in 2024. Although California is closer behind, there is a steep decrease in border traffic around the Canadian border and other Southern states beyond Texas and California.
@@ -207,3 +302,124 @@ ggplotly(transportation_graph)
 Analysis:
 
 The vast majority of border traffic is personal vehicle traffic. Pedestrian border traffic blew me away with almost 50 million pedestrians crossing the border in 2019. Group transportation took a hit during the pandemic, with buses dropping more than half of their report in 2019, from almost 230,000 to almost 100,000 in 2020.
+
+```{r}
+#| label: coordinate map
+
+border_coord <- border |>
+  filter(
+    year == "2024",
+    state != "Alaska"
+  ) |>
+  group_by(
+    state,
+    port_name
+  ) |>
+  mutate(
+    port_count = str_count(unique(port_name, ", "))
+  ) |>
+  summarize(
+    border_count = sum(port_count, na.rm = TRUE),
+    value_sum = sum(value, na.rm = TRUE),
+    longitude = mean(longitude, na.rm = TRUE), #avg longitude
+    latitude = mean(latitude, na.rm = TRUE), #avg latitude
+    .groups = "drop"
+  ) |>
+  arrange(
+    desc(value_sum)
+  )
+
+border_coord
+```
+
+```{r}
+#| label: border dot plot
+
+border_coord_plot <- states_plot +
+  geom_point(
+   data = border_coord,
+   alpha = 0.7,
+   aes(
+     x = longitude,
+     y = latitude,
+     color = border_count,
+     size = value_sum
+   )
+  ) +
+  labs(
+    title = str_wrap("Border Traffic Location and Amount in 2024"),
+    subtitle = str_wrap("The color of the spots on the map are determined by how many times each port was visited per year. The size of the spots represent the total amount of border crossing in its specific port for all of 2024. Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: Department of Transportation",
+    color = "Port Visit Instances",
+    size = "# of Border Entries"
+  ) +
+  scale_size_continuous(range = c(1,10), labels = comma) +
+  scale_color_gradient(low = "blue", high = "orange", labels = comma)
+  
+
+border_coord_plot
+```
+
+Revised Analysis:
+
+As reflected by the country border crossing data, the Mexico-America border has much more traffic than the Canada-America border. Most ports are visited between 1,000 and 2,000 times per year, with an exception of many ports in the North. New York sees a lot of border entry instances and quantity of crossing into the United States. Texas and California receive the most border entries of any other state.
+
+```{r}
+#| label: coordinate map transportation
+
+border_trans_coord <- border |>
+  filter(
+    year == "2024",
+    state != "Alaska"
+  ) |>
+  group_by(
+    state,
+    measure
+  ) |>
+  mutate(
+    transportation_count = str_count(unique(measure, ", "))
+  ) |>
+  summarize(
+    trans_count = sum(transportation_count, na.rm = TRUE),
+    value_sum = sum(value, na.rm = TRUE),
+    longitude = mean(longitude, na.rm = TRUE), #avg longitude
+    latitude = mean(latitude, na.rm = TRUE), #avg latitude
+    .groups = "drop"
+  ) |>
+  arrange(
+    desc(value_sum)
+  )
+
+border_trans_coord
+```
+
+```{r}
+#| label: transportation dot plot
+
+border_trans_plot <- states_plot +
+  geom_point(
+   data = border_trans_coord,
+   alpha = 1,
+   aes(
+     x = longitude,
+     y = latitude,
+     color = measure,
+     size = value_sum
+   )
+  ) +
+  labs(
+    title = str_wrap("Border Traffic Location and Amount in 2024"),
+    subtitle = str_wrap("The color of the spots on the map are determined by the type of transportation. The size of the spots represent the total amount of border crossing in its specific port for all of 2024. Chart created by Meredith Roberts for the Data Visualization Independent Study."),
+    caption = "Source: Department of Transportation",
+    color = "Type of Transportation",
+    size = "Transportation Instances"
+  ) +
+  scale_size_continuous(range = c(1,10), labels = comma)
+  
+
+border_trans_plot
+```
+
+Revised Analysis:
+
+Traffic seems to be highly concentrated on a few ports in each border state. There is heavy pedestrian and personal vehicle traffic in Texas, California and New York. States in the Midwest get virtually no traffic in comparison to the South or New York and Washington.
