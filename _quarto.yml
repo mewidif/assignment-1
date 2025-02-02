@@ -8,7 +8,7 @@ website:
   title: "Assignment #1"
   sidebar:
     contents:
-      - href: index.qmd
+      - href: about.qmd
         text: Home
       - auto: "*.qmd"
 
